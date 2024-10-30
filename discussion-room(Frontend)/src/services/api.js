@@ -48,6 +48,11 @@ export const getTopics = async () => {
   return response.data;
 };
 
+export const getTopic = async (topicId) => {
+  const response = await api.get(`/topics/${topicId}/`);
+  return response.data;
+};
+
 export const createTopic = async (title, description) => {
   const response = await api.post('/topics/', { title, description });
   return response.data;
