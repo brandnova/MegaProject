@@ -1,0 +1,1374 @@
+// src/App.jsx
+
+import React, { useState } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext';
+import Home from './pages/Home';
+import Chat from './pages/Chat';
+import { MessageCircle, LogOut, LogIn, User, Menu } from 'lucide-react';
+
+export default function Component() {
+  const { user, logoutUser } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <nav className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <Link to="/" className="flex-shrink-0 flex items-center">
+                <MessageCircle className="h-8 w-8 text-blue-500" />
+                <span className="ml-2 text-xl font-bold text-gray-900">Discussion Room</span>
+              </Link>
+            </div>
+            
+            {/* Toggle button for mobile menu */}
+            <div className="flex items-center sm:hidden">
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Links displayed based on screen size */}
+            <div className={`flex-col sm:flex-row sm:flex items-center space-x-4 ${isMenuOpen ? 'flex' : 'hidden'} sm:flex`}>
+              {user ? (
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm font-medium text-gray-700">Welcome, {user.username}!</span>
+                  <button
+                    onClick={logoutUser}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/"
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Login / Register
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="flex-grow">
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/chat/:id" element={<Chat />} />
+          </Routes>
+        </div>
+      </main>
+
+      <footer className="bg-white shadow-sm mt-auto">
+        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm text-gray-500">
+            © 2024 Discussion Room. All rights reserved.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+
+
+// src/pages/Home.jsx
+
+import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import ChatRoom from '../components/ChatRoom';
+import { Navigate } from 'react-router-dom';
+
+const Chat = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <ChatRoom />;
+};
+
+export default Chat;
+
+
+
+// src/pages/Home.jsx
+
+
+import React from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import AuthForm from '../components/AuthForm';
+import RoomList from '../components/RoomList';
+
+const Home = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div className="container mx-auto px-4">
+      {user ? <RoomList /> : <AuthForm />}
+    </div>
+  );
+};
+
+export default Home;
+
+
+// src/components/AuthForm.jsx
+
+
+import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { 
+  User, Mail, Lock, Eye, EyeOff, Loader2, 
+  LogIn, UserPlus, AlertCircle 
+} from 'lucide-react';
+
+const AuthForm = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [errors, setErrors] = useState({});
+  const { loginUser, registerUser } = useAuth();
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    }
+
+    if (!isLogin) {
+      if (!formData.email.trim()) {
+        newErrors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email';
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    return newErrors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const formErrors = validateForm();
+    
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      return;
+    }
+
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      if (isLogin) {
+        await loginUser(formData.username, formData.password);
+      } else {
+        await registerUser(
+          formData.username,
+          formData.email,
+          formData.password,
+          formData.confirmPassword
+        );
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      try {
+        const errorData = JSON.parse(error.message);
+        setErrors(errorData);
+      } catch {
+        setErrors({ 
+          non_field_errors: [error.message || 'Authentication failed. Please try again.']
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  return (
+    <div className=" flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+        <div className="text-center">
+          <h2 className="text-3xl font-extrabold text-gray-900 mb-2">
+            {isLogin ? 'Welcome Back!' : 'Create Account'}
+          </h2>
+          <p className="text-gray-600">
+            {isLogin 
+              ? 'Enter your credentials to access your account'
+              : 'Fill in your details to get started'
+            }
+          </p>
+        </div>
+
+        {errors.non_field_errors && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+              <p className="text-sm text-red-700">{errors.non_field_errors}</p>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleInputChange}
+                className={`block w-full pl-10 pr-3 py-2 border ${
+                  errors.username ? 'border-red-300' : 'border-gray-300'
+                } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                placeholder="Username"
+              />
+            </div>
+            {errors.username && (
+              <p className="mt-1 text-sm text-red-600">{errors.username}</p>
+            )}
+          </div>
+
+          {!isLogin && (
+            <div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className={`block w-full pl-10 pr-3 py-2 border ${
+                    errors.email ? 'border-red-300' : 'border-gray-300'
+                  } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  placeholder="Email address"
+                />
+              </div>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className={`block w-full pl-10 pr-10 py-2 border ${
+                  errors.password ? 'border-red-300' : 'border-gray-300'
+                } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                placeholder="Password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <Eye className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+            )}
+          </div>
+
+          {!isLogin && (
+            <div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className={`block w-full pl-10 pr-10 py-2 border ${
+                    errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                  } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  placeholder="Confirm password"
+                />
+              </div>
+              {errors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+              )}
+            </div>
+          )}
+
+          <div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  {isLogin ? (
+                    <LogIn className="w-5 h-5 mr-2" />
+                  ) : (
+                    <UserPlus className="w-5 h-5 mr-2" />
+                  )}
+                  {isLogin ? 'Sign In' : 'Sign Up'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setErrors({});
+              setFormData({
+                username: '',
+                email: '',
+                password: '',
+                confirmPassword: ''
+              });
+            }}
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {isLogin ? 'Need an account? Sign up' : 'Already have an account? Sign in'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AuthForm;
+
+
+
+
+// src/components/ChatRoom.jsx
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { getMessages, sendMessage, getTopic } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import Message from './Message';
+import ReactQuill from 'react-quill';
+import { 
+  Send, 
+  ChevronDown, 
+  Calendar,
+  MessageCircle,
+  Info,
+} from 'lucide-react';
+import Prism from 'prismjs';
+import 'react-quill/dist/quill.snow.css';
+import { toast } from 'react-hot-toast';
+
+
+const ChatRoom = () => {
+  // All hooks declared at the top level
+  const { id } = useParams();
+  const { user } = useAuth();
+  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  
+  const [messages, setMessages] = useState([]);
+  const [topic, setTopic] = useState(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showTopicInfo, setShowTopicInfo] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [lastMessageCount, setLastMessageCount] = useState(0);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  const modules = {
+    toolbar: [
+      ['bold', 'italic', 'underline', 'strike'],
+      ['blockquote', 'code-block'],
+      ['link'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    ],
+  };
+
+  useEffect(() => {
+    if (messages.length > lastMessageCount) {
+      const isScrolledToBottom = 
+        chatContainerRef.current.scrollHeight - chatContainerRef.current.scrollTop 
+        <= chatContainerRef.current.clientHeight + 100;
+
+      if (isScrolledToBottom) {
+        scrollToBottom();
+      } else {
+        setHasNewMessages(true);
+      }
+      setLastMessageCount(messages.length);
+    }
+    Prism.highlightAll();
+  }, [messages, lastMessageCount]);
+
+  const fetchTopic = async () => {
+    try {
+      const topicData = await getTopic(id);
+      setTopic(topicData);
+    } catch (error) {
+      console.error('Failed to fetch topic:', error);
+      setError('Failed to fetch topic details.');
+    }
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const data = await getMessages(id);
+      if (data.length !== messages.length) {
+        setMessages(data);
+      }
+      setError(null);
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+      setError('Failed to fetch messages. Please try again later.');
+    }
+  };
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      await Promise.all([fetchTopic(), fetchMessages()]);
+    };
+    fetchInitialData();
+    const interval = setInterval(fetchMessages, 3000);
+    return () => clearInterval(interval);
+  }, [id]);
+
+  useEffect(() => {
+    if (messages.length > lastMessageCount) {
+      // Check if the new message is from the current user
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage && latestMessage.user.id === user.id) {
+        scrollToBottom();
+      }
+      setLastMessageCount(messages.length);
+    }
+  }, [messages, lastMessageCount, user.id]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!chatContainerRef.current) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      const scrolledUp = scrollHeight - scrollTop - clientHeight > 200; // Show button when scrolled up more than 200px
+      setShowScrollButton(scrolledUp);
+    };
+
+    const chatContainer = chatContainerRef.current;
+    if (chatContainer) {
+      chatContainer.addEventListener('scroll', handleScroll);
+      return () => chatContainer.removeEventListener('scroll', handleScroll);
+    }
+  }, []);
+
+  const handleSendMessage = async () => {
+    if (newMessage.trim()) {
+      setIsLoading(true);
+      try {
+        await sendMessage(id, newMessage);
+        setNewMessage('');
+        await fetchMessages();
+        scrollToBottom(); // Auto-scroll only after sending a message
+        setError(null);
+      } catch (error) {
+        setError('Failed to send message. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollButton(false);
+  };
+
+
+  const copyMessageToClipboard = (content) => {
+    // Remove HTML tags when copying
+    const textContent = content.replace(/<[^>]+>/g, '');
+    navigator.clipboard.writeText(textContent).then(() => {
+      toast.success('Message copied to clipboard');
+    }, (err) => {
+      console.error('Could not copy text: ', err);
+      toast.error('Failed to copy message');
+    });
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  return (
+    <div className="h-full w-full flex flex-col bg-gray-50">
+      {/* Header */}
+      <div className="sticky top-0 bg-white shadow-sm px-4 py-3 z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="flex-1">
+              <div className="flex items-center space-x-2">
+                <h2 className="text-lg font-semibold">{topic?.title || 'Loading...'}</h2>
+                <button 
+                  onClick={() => setShowTopicInfo(!showTopicInfo)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <Info size={16} className="text-gray-500" />
+                </button>
+              </div>
+              <div className="flex items-center text-sm text-gray-500 space-x-4">
+                <div className="flex items-center space-x-1">
+                  <MessageCircle size={14} />
+                  <span>{messages.length} messages</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Calendar size={14} />
+                  <span>Created {topic ? formatDate(topic.created_at) : '...'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Topic Info Panel */}
+        {showTopicInfo && topic && (
+          <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="space-y-2">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700">Description</h3>
+                <p className="text-sm text-gray-600 mt-1">{topic.description}</p>
+              </div>
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div>
+                  <span className="font-medium">Created by:</span>{' '}
+                  {topic.created_by.username}
+                </div>
+                <div>
+                  <span className="font-medium">Status:</span>{' '}
+                  <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                    topic.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {topic.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Messages Container */}
+      <div 
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-2 bg-gradient-to-b from-gray-50 to-white scroll-smooth"
+      >
+        {messages.map((message, index) => (
+          <Message
+            key={message.id}
+            message={message}
+            isFirstInGroup={index === 0 || messages[index - 1].user.id !== message.user.id}
+            isLastInGroup={index === messages.length - 1 || messages[index + 1].user.id !== message.user.id}
+            isCurrentUser={message.user.id === user.id}
+            onCopy={copyMessageToClipboard}
+          />
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {showScrollButton && (
+        <button
+          onClick={scrollToBottom}
+          className="fixed bottom-32 left-1/2 transform -translate-x-1/2 
+                     bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg
+                     hover:bg-blue-700 transition-colors duration-200 ease-in-out
+                     flex items-center space-x-2 z-10"
+        >
+          <span>Scroll to Bottom</span>
+          <ChevronDown size={16} />
+        </button>
+      )}
+
+      {/* Message Input */}
+      <div className="sticky bottom-0 bg-white border-t px-4 py-3">
+        <div className="max-w-6xl mx-auto">
+          <ReactQuill
+            value={newMessage}
+            onChange={setNewMessage}
+            modules={modules}
+            placeholder="Type your message..."
+            className="bg-white rounded-lg mb-2 [&_.ql-toolbar]:border-gray-200 
+                       [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[100px]
+                       [&_.ql-editor]:max-h-[200px] [&_.ql-editor]:overflow-y-auto
+                       [&_.ql-editor]:text-gray-700 [&_.ql-editor]:text-sm
+                       [&_.ql-toolbar]:bg-gray-50 [&_.ql-toolbar]:rounded-t-lg
+                       [&_.ql-container]:rounded-b-lg"
+          />
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={handleSendMessage}
+              disabled={isLoading || !newMessage.trim()}
+              className={`flex items-center space-x-2 px-6 py-2.5 rounded-lg
+                ${isLoading || !newMessage.trim() 
+                  ? 'bg-gray-300 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+                } text-white transition-colors duration-200`}
+            >
+              <span>Send</span>
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChatRoom;
+
+
+
+// src/components/Message.jsx
+
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Copy, Check, MessageSquare, Clock, Share2, Bookmark, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-json';
+import 'prismjs/themes/prism-tomorrow.css';
+
+const MAX_VISIBLE_LENGTH = 300;
+const MIN_LENGTH_FOR_TRUNCATION = 400;
+const COPY_FEEDBACK_DURATION = 2000;
+
+const Message = ({ 
+  message, 
+  isFirstInGroup, 
+  isLastInGroup, 
+  isCurrentUser, 
+  onCopy,
+  onReply,
+  onBookmark,
+  onReport 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [shouldShowExpandButton, setShouldShowExpandButton] = useState(false);
+  const [copiedStates, setCopiedStates] = useState(new Map());
+  const [showActions, setShowActions] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const messageRef = useRef(null);
+  const actionsRef = useRef(null);
+
+  // Effect for syntax highlighting and content height measurement
+  useEffect(() => {
+    const measureHeight = () => {
+      const content = document.getElementById(`message-content-${message.id}`);
+      if (content) {
+        const height = content.scrollHeight;
+        setContentHeight(height);
+        setShouldShowExpandButton(
+          height > 150 || message.content.length > MIN_LENGTH_FOR_TRUNCATION
+        );
+      }
+    };
+
+    requestAnimationFrame(() => {
+      Prism.highlightAll();
+      measureHeight();
+    });
+
+    // Re-measure on window resize
+    window.addEventListener('resize', measureHeight);
+    return () => window.removeEventListener('resize', measureHeight);
+  }, [message.id, message.content, isExpanded]);
+
+  const formatTimestamp = useCallback((timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }`;
+  }, []);
+
+  // Memoize language detection
+  const detectLanguage = useCallback((code) => {
+    const patterns = {
+      jsx: [/import\s+React/, /jsx/, /<[\w\s]*>/],
+      javascript: [/function/, /const\s+/, /let\s+/, /=>/],
+      typescript: [/interface\s+/, /type\s+[A-Z]/, /<[A-Z][^>]*>/],
+      python: [/def\s+/, /class\s+.*:/],
+      json: [/^[\s\n]*[{[]/, /"[\w_]+"\s*:/],
+      css: [/{[\s\S]*};/, /\.[a-z]/i]
+    };
+
+    for (const [language, tests] of Object.entries(patterns)) {
+      if (tests.some(pattern => pattern.test(code))) {
+        return language;
+      }
+    }
+    return 'javascript';
+  }, []);
+
+  // Memoize code block processing
+  const processCodeBlock = useCallback((match, code) => {
+    const decodedCode = code
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/\&nbsp;/g, ' ');
+
+    const language = detectLanguage(decodedCode);
+    try {
+      const highlightedCode = Prism.highlight(
+        decodedCode,
+        Prism.languages[language] || Prism.languages.javascript,
+        language
+      );
+      return `<pre><code class="language-${language}">${highlightedCode}</code></pre>`;
+    } catch (error) {
+      console.error('Syntax highlighting error:', error);
+      return `<pre><code class="language-${language}">${decodedCode}</code></pre>`;
+    }
+  }, [detectLanguage]);
+
+  // Process message content with memoization
+  const processedContent = useMemo(() => {
+    const quillCodeBlockRegex = /<pre class="ql-syntax" spellcheck="false">([\s\S]*?)<\/pre>/gi;
+    let processed = message.content.replace(quillCodeBlockRegex, processCodeBlock);
+    return processed.split(/(<pre><code.*?<\/code><\/pre>)/g);
+  }, [message.content, processCodeBlock]);
+
+  // Handle click outside to close actions menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (actionsRef.current && !actionsRef.current.contains(event.target)) {
+        setShowActions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Preserve exact formatting when copying code
+  const extractExactCode = useCallback((codeElement) => {
+    // Get the original code from the data attribute we'll store
+    const originalCode = codeElement.getAttribute('data-original-code');
+    if (originalCode) {
+      return originalCode;
+    }
+
+    // Fallback: try to reconstruct from the HTML content
+    const content = codeElement.textContent || '';
+    
+    // Preserve indentation by looking at the HTML structure
+    const lines = content.split('\n');
+    const processedLines = lines.map(line => {
+      // Count leading spaces in the HTML to preserve exact indentation
+      const match = line.match(/^[\s\u00A0]*/);
+      const indentation = match ? match[0].length : 0;
+      return ' '.repeat(indentation) + line.trim();
+    });
+
+    return processedLines.join('\n');
+  }, []);
+
+  const handleCopy = useCallback(async (text, id, isCode = false) => {
+    try {
+      let contentToCopy;
+      
+      if (isCode) {
+        // For code blocks, preserve exact formatting
+        const codeElement = document.querySelector(`[data-code-id="${id}"]`);
+        contentToCopy = codeElement ? extractExactCode(codeElement) : text;
+      } else {
+        // For regular messages, clean up but preserve basic formatting
+        contentToCopy = text
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/p><p>/gi, '\n\n')
+          .replace(/<[^>]+>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/&#x27;/g, "'");
+      }
+
+      await navigator.clipboard.writeText(contentToCopy);
+      
+      setCopiedStates(prev => new Map(prev).set(id, true));
+      
+      setTimeout(() => {
+        setCopiedStates(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(id);
+          return newMap;
+        });
+      }, COPY_FEEDBACK_DURATION);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  }, [extractExactCode]);
+
+  const CopyButton = useCallback(({ content, id, isCode, className }) => {
+    const isCopied = copiedStates.get(id);
+    
+    return (
+      <button
+        onClick={() => handleCopy(content, id, isCode)}
+        className={`${className} flex items-center gap-1 transition-all duration-200
+                   hover:scale-105 active:scale-95`}
+        aria-label={isCopied ? "Copied!" : "Copy to clipboard"}
+      >
+        {isCopied ? (
+          <Check size={14} className="text-green-400" />
+        ) : (
+          <Copy size={14} />
+        )}
+      </button>
+    );
+  }, [copiedStates, handleCopy]);
+
+  const MessageActions = useCallback(() => (
+    <div 
+      ref={actionsRef}
+      className={`absolute ${isCurrentUser ? 'left-0' : 'right-0'} top-0 -mt-8
+                 flex items-center gap-2 bg-white dark:bg-gray-800 rounded-full
+                 shadow-lg py-1 px-2 text-gray-600 dark:text-gray-300
+                 transform transition-all duration-200
+                 ${showActions ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+    >
+      
+      <button 
+        onClick={() => handleCopy(message.content, `message-${message.id}`)}
+        className="p-1 hover:text-green-500 dark:hover:text-green-400 transition-colors"
+        aria-label="Copy message"
+      >
+        <Copy size={14} />
+      </button>
+      
+    </div>
+  ), [showActions, isCurrentUser, message.id, handleCopy, onReply, onBookmark, onReport]);
+
+  const renderContent = useCallback((parts) => {
+    return parts.map((part, i) => {
+      if (part.startsWith('<pre><code')) {
+        const codeContent = part.match(/<pre><code.*?>([\s\S]*?)<\/code><\/pre>/)?.[1] || '';
+        const codeId = `code-${message.id}-${i}`;
+        
+        return (
+          <div key={i} className="relative group my-2">
+            <pre className="!bg-[#1e1e1e] rounded-lg p-4 overflow-x-auto">
+              <code 
+                data-code-id={codeId}
+                data-original-code={codeContent}
+                className="text-sm font-mono"
+                dangerouslySetInnerHTML={{ __html: codeContent }}
+              />
+              <CopyButton
+                content={codeContent}
+                id={codeId}
+                isCode={true}
+                className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 
+                          text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 
+                          transition-opacity duration-200"
+              />
+            </pre>
+          </div>
+        );
+      }
+      
+      return (
+        <div 
+          key={i} 
+          className="prose prose-sm max-w-none dark:prose-invert"
+          dangerouslySetInnerHTML={{ __html: part }}
+        />
+      );
+    });
+  }, [message.id, CopyButton]);
+
+  return (
+    <div 
+      className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} 
+                 ${isFirstInGroup ? 'mt-4' : 'mt-1'}`}
+      ref={messageRef}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => {
+        setIsHovering(false);
+        if (!showActions) {
+          setTimeout(() => setShowActions(false), 300);
+        }
+      }}
+    >
+      <div className={`relative max-w-[85%] md:max-w-[70%] min-w-[200px] 
+                      ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+        {isHovering && <MessageActions />}
+        
+        {isFirstInGroup && (
+          <div className={`flex items-center space-x-2 mb-1 
+                          ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {message.user.username}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+              <Clock size={12} className="mr-1" />
+              {formatTimestamp(message.created_at)}
+            </span>
+          </div>
+        )}
+
+        <div
+          className={`rounded-2xl px-4 py-2 shadow-sm group
+            ${isCurrentUser 
+              ? 'bg-blue-600 text-gray-50' 
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'}
+            ${!isLastInGroup ? 'mb-1' : 'mb-2'}
+            ${isFirstInGroup && isCurrentUser ? 'rounded-tr-md' : ''}
+            ${isFirstInGroup && !isCurrentUser ? 'rounded-tl-md' : ''}
+            transition-all duration-200 hover:shadow-md`}
+          onClick={() => setShowActions(!showActions)}
+        >
+          <div 
+            id={`message-content-${message.id}`}
+            className={`
+              ${isCurrentUser ? 'prose-invert' : ''}
+              relative
+              transition-[max-height,opacity] duration-300 ease-in-out
+              ${!isExpanded && shouldShowExpandButton ? 'max-h-[150px]' : 'max-h-none'}
+              ${!isExpanded && shouldShowExpandButton ? 'overflow-hidden' : ''}
+              [&_pre]:bg-[#1e1e1e] [&_pre]:rounded-lg [&_pre]:p-3 
+              [&_pre]:overflow-x-auto [&_pre]:my-2
+              [&_code]:font-mono [&_code]:text-sm
+              [&_blockquote]:border-l-4 [&_blockquote]:pl-4 [&_blockquote]:italic
+              [&_pre_.token.comment]:text-gray-400
+              [&_pre_.token.string]:text-green-300
+              [&_pre_.token.number]:text-orange-300
+              [&_pre_.token.boolean]:text-orange-300
+              [&_pre_.token.keyword]:text-purple-300
+              [&_pre_.token.function]:text-blue-300
+              [&_pre_.token.operator]:text-gray-300
+              [&_pre_.token.punctuation]:text-gray-300
+              sm:text-base text-sm`}
+          >
+            {renderContent(processedContent)}
+            {!isExpanded && shouldShowExpandButton && (
+              <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t 
+                            from-gray-300 dark:from-gray-900 to-transparent" />
+            )}
+          </div>
+          
+          {shouldShowExpandButton && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+              className={`text-xs mt-1 hover:underline flex items-center
+                ${isCurrentUser ? 'text-blue-100' : 'text-blue-600 dark:text-blue-400'}
+                transition-transform duration-200 hover:scale-105`}
+            >
+              {isExpanded ? (
+                <span className="flex items-center">Show less <ChevronLeft size={14} className="ml-1" /></span>
+              ) : (
+                <span className="flex items-center">Show more <ChevronRight size={14} className="ml-1" /></span>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Message;
+
+
+
+// src/components/RoomList.jsx
+
+
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { getTopics, createTopic } from '../services/api';
+import { 
+  Search, Plus, X, Users, MessageCircle, Calendar,
+  Loader2, Filter, SortAsc, SortDesc, Menu
+} from 'lucide-react';
+
+const RoomList = () => {
+  const [topics, setTopics] = useState([]);
+  const [filteredTopics, setFilteredTopics] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState('all'); 
+  const [sortBy, setSortBy] = useState('newest');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  const [newTopic, setNewTopic] = useState({
+    title: '',
+    description: ''
+  });
+
+  useEffect(() => {
+    fetchTopics();
+  }, []);
+
+  useEffect(() => {
+    filterAndSortTopics();
+  }, [topics, searchTerm, filter, sortBy]);
+
+  const fetchTopics = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getTopics();
+      setTopics(data);
+      setError('');
+    } catch (error) {
+      setError('Failed to fetch topics. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filterAndSortTopics = () => {
+    let filtered = [...topics];
+
+    if (searchTerm) {
+      filtered = filtered.filter(topic => 
+        topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        topic.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (filter !== 'all') {
+      filtered = filtered.filter(topic => 
+        filter === 'active' ? topic.is_active : !topic.is_active
+      );
+    }
+
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at);
+      const dateB = new Date(b.created_at);
+      return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
+    setFilteredTopics(filtered);
+  };
+
+  const handleCreateTopic = async (e) => {
+    e.preventDefault();
+    try {
+      await createTopic(newTopic.title, newTopic.description);
+      setNewTopic({ title: '', description: '' });
+      setShowCreateForm(false);
+      await fetchTopics();
+    } catch (error) {
+      setError('Failed to create topic. Please try again.');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      return new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: 'numeric'
+      }).format(date);
+    }
+    
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-6">
+      {/* Header */}
+      <div className="sticky top-0 z-10 p-4 flex w-full justify-end">
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors sm:px-4"
+        >
+          <Plus className="w-5 h-5" />
+          <span className="hidden sm:inline">New Topic</span>
+        </button>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 mt-4">
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Search and Filters */}
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-4 space-y-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search topics..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+          </div>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="sm:hidden flex items-center justify-between w-full px-4 py-2 border rounded-lg bg-white"
+            >
+              <span className="flex items-center">
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+              </span>
+              <Menu className="w-4 h-4" />
+            </button>
+
+            <div className={`flex flex-col sm:flex-row gap-2 ${showFilters ? 'block' : 'hidden sm:flex'}`}>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="px-4 py-2 border rounded-lg bg-white w-full sm:w-auto"
+              >
+                <option value="all">All Topics</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              
+              <button
+                onClick={() => setSortBy(prev => prev === 'newest' ? 'oldest' : 'newest')}
+                className="flex items-center justify-center space-x-2 px-4 py-2 border rounded-lg hover:bg-gray-50 w-full sm:w-auto"
+              >
+                <span className="mr-2">Sort</span>
+                {sortBy === 'newest' ? (
+                  <SortDesc className="w-4 h-4" />
+                ) : (
+                  <SortAsc className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Topics List */}
+        {filteredTopics.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg">
+            <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No topics found</h3>
+            <p className="text-gray-500 text-sm">
+              {searchTerm ? "Try adjusting your search terms" : "Be the first to create a topic!"}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {filteredTopics.map((topic) => (
+              <Link
+                key={topic.id}
+                to={`/chat/${topic.id}`}
+                className="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-4">
+                    <div>
+                      <h3 className="text-lg sm:text-xl font-semibold mb-2">{topic.title}</h3>
+                      <p className="text-gray-600 text-sm line-clamp-2">{topic.description}</p>
+                    </div>
+                    <span
+                      className={`self-start px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
+                        topic.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {topic.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
+                    <div className="flex items-center">
+                      <Users className="w-4 h-4 mr-1" />
+                      <span>{topic.created_by.username}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      <span>{formatDate(topic.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Topic Modal */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-4 sm:p-6 border-b sticky top-0 bg-white">
+              <h3 className="text-lg sm:text-xl font-semibold">Create New Topic</h3>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateTopic} className="p-4 sm:p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={newTopic.title}
+                  onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter topic title"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={newTopic.description}
+                  onChange={(e) => setNewTopic({ ...newTopic, description: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows="4"
+                  placeholder="Enter topic description"
+                  required
+                ></textarea>
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-4 py-2 border rounded-lg hover:bg-gray-50 w-full sm:w-auto"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-full sm:w-auto"
+                >
+                  Create Topic
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RoomList;
