@@ -16,6 +16,14 @@ class DiscussionTopicViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    @action(detail=True, methods=['post'])
+    def toggle_commenting(self, request, pk=None):
+        topic = self.get_object()
+        topic.is_commenting_enabled = not topic.is_commenting_enabled
+        topic.save()
+        serializer = self.get_serializer(topic)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
         topic = self.get_object()
@@ -39,6 +47,25 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['put', 'patch'])
+    def edit(self, request, pk=None):
+        message = self.get_object()
+        if message.user == request.user:
+            serializer = self.get_serializer(message, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'You can only edit your own messages.'}, status=status.HTTP_403_FORBIDDEN)
+
+    @action(detail=True, methods=['delete'])
+    def delete(self, request, pk=None):
+        message = self.get_object()
+        if message.user == request.user:
+            message.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'error': 'You can only delete your own messages.'}, status=status.HTTP_403_FORBIDDEN)
 
 
 class AuthViewSet(viewsets.ViewSet):
@@ -77,7 +104,8 @@ class AuthViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def user(self, request):
         if request.user.is_authenticated:
-            return Response(UserSerializer(request.user).data)
+            user_data = UserSerializer(request.user).data
+            return Response(user_data)
         return Response({'error': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
 
     @action(detail=False, methods=['put', 'patch'])

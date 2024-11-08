@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { getMessages, sendMessage, getTopic } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
-import Message from './Message';
 import ReactQuill from 'react-quill';
 import { 
   Send, 
@@ -14,15 +11,16 @@ import {
 import Prism from 'prismjs';
 import 'react-quill/dist/quill.snow.css';
 import { toast } from 'react-hot-toast';
-
+import { getMessages, sendMessage, getTopic } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import Message from './Message';
 
 const ChatRoom = () => {
-  // All hooks declared at the top level
   const { id } = useParams();
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
-  
+
   const [messages, setMessages] = useState([]);
   const [topic, setTopic] = useState(null);
   const [newMessage, setNewMessage] = useState('');
@@ -33,6 +31,7 @@ const ChatRoom = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isCommentingEnabled, setIsCommentingEnabled] = useState(false);
 
   const modules = {
     toolbar: [
@@ -44,25 +43,19 @@ const ChatRoom = () => {
   };
 
   useEffect(() => {
-    if (messages.length > lastMessageCount) {
-      const isScrolledToBottom = 
-        chatContainerRef.current.scrollHeight - chatContainerRef.current.scrollTop 
-        <= chatContainerRef.current.clientHeight + 100;
-
-      if (isScrolledToBottom) {
-        scrollToBottom();
-      } else {
-        setHasNewMessages(true);
-      }
-      setLastMessageCount(messages.length);
-    }
-    Prism.highlightAll();
-  }, [messages, lastMessageCount]);
+    const fetchInitialData = async () => {
+      await Promise.all([fetchTopic(), fetchMessages()]);
+    };
+    fetchInitialData();
+    const interval = setInterval(fetchMessages, 3000);
+    return () => clearInterval(interval);
+  }, [id]);
 
   const fetchTopic = async () => {
     try {
       const topicData = await getTopic(id);
       setTopic(topicData);
+      setIsCommentingEnabled(topicData.is_commenting_enabled);
     } catch (error) {
       console.error('Failed to fetch topic:', error);
       setError('Failed to fetch topic details.');
@@ -119,7 +112,7 @@ const ChatRoom = () => {
   }, []);
 
   const handleSendMessage = async () => {
-    if (newMessage.trim()) {
+    if (newMessage.trim() && (isCommentingEnabled || user.is_staff)) {
       setIsLoading(true);
       try {
         await sendMessage(id, newMessage);
@@ -254,36 +247,39 @@ const ChatRoom = () => {
       )}
 
       {/* Message Input */}
-      <div className="sticky bottom-0 bg-white border-t px-4 py-3">
-        <div className="max-w-6xl mx-auto">
-          <ReactQuill
-            value={newMessage}
-            onChange={setNewMessage}
-            modules={modules}
-            placeholder="Type your message..."
-            className="bg-white rounded-lg mb-2 [&_.ql-toolbar]:border-gray-200 
-                       [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[100px]
-                       [&_.ql-editor]:max-h-[200px] [&_.ql-editor]:overflow-y-auto
-                       [&_.ql-editor]:text-gray-700 [&_.ql-editor]:text-sm
-                       [&_.ql-toolbar]:bg-gray-50 [&_.ql-toolbar]:rounded-t-lg
-                       [&_.ql-container]:rounded-b-lg"
-          />
-          <div className="flex justify-end mt-2">
-            <button
-              onClick={handleSendMessage}
-              disabled={isLoading || !newMessage.trim()}
-              className={`flex items-center space-x-2 px-6 py-2.5 rounded-lg
-                ${isLoading || !newMessage.trim() 
-                  ? 'bg-gray-300 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-                } text-white transition-colors duration-200`}
-            >
-              <span>Send</span>
-              <Send size={16} />
-            </button>
+      {isCommentingEnabled || user.is_staff ? (
+        <div className="sticky bottom-0 bg-white border-t px-4 py-3">
+          <div className="max-w-6xl mx-auto">
+            <ReactQuill
+              value={newMessage}
+              onChange={(value) => setNewMessage(value)}
+              modules={modules}
+              placeholder="Type your message..."
+              className={`bg-white rounded-lg mb-2 [&_.ql-toolbar]:border-gray-200 
+                        [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[100px]
+                        [&_.ql-editor]:max-h-[200px] [&_.ql-editor]:overflow-y-auto
+                        [&_.ql-editor]:text-gray-700 [&_.ql-editor]:text-sm
+                        [&_.ql-toolbar]:bg-gray-50 [&_.ql-toolbar]:rounded-t-lg
+                        [&_.ql-container]:rounded-b-lg`}
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={handleSendMessage}
+                disabled={isLoading || !newMessage.trim()}
+                className={`flex items-center space-x-2 px-6 py-2.5 rounded-lg
+                  ${isLoading || !newMessage.trim() ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white transition-colors duration-200`}
+              >
+                <span>Send</span>
+                <Send size={16} />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="sticky bottom-0 bg-white border-t px-4 py-3 text-center text-gray-600">
+          Commenting is disabled for this topic.
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Copy, Check, MessageSquare, Clock, Share2, Bookmark, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Copy, Check, Pencil, Clock, Trash, Bookmark, Flag, ChevronLeft, ChevronRight } from 'lucide-react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-jsx';
@@ -8,20 +8,23 @@ import 'prismjs/components/prism-python';
 import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-json';
 import 'prismjs/themes/prism-tomorrow.css';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import { editMessage, deleteMessage } from '.././services/api';
 
 const MAX_VISIBLE_LENGTH = 300;
 const MIN_LENGTH_FOR_TRUNCATION = 400;
 const COPY_FEEDBACK_DURATION = 2000;
 
-const Message = ({ 
-  message, 
-  isFirstInGroup, 
-  isLastInGroup, 
-  isCurrentUser, 
+const Message = ({
+  message,
+  isFirstInGroup,
+  isLastInGroup,
+  isCurrentUser,
   onCopy,
   onReply,
   onBookmark,
-  onReport 
+  onReport,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [contentHeight, setContentHeight] = useState(0);
@@ -31,6 +34,26 @@ const Message = ({
   const [isHovering, setIsHovering] = useState(false);
   const messageRef = useRef(null);
   const actionsRef = useRef(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(message.content);
+
+  const handleEdit = async () => {
+    try {
+      await editMessage(message.id, editedContent);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error editing message:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteMessage(message.id);
+      // Notify parent component or handle deletion in some other way
+    } catch (error) {
+      console.error('Error deleting message:', error);
+    }
+  };
 
   // Effect for syntax highlighting and content height measurement
   useEffect(() => {
@@ -269,28 +292,27 @@ const Message = ({
   }, [message.id, CopyButton]);
 
   return (
-    <div 
-      className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} 
-                 ${isFirstInGroup ? 'mt-4' : 'mt-1'}`}
+    <div
+      className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-4' : 'mt-1'}`}
       ref={messageRef}
       onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => {
-        setIsHovering(false);
-        if (!showActions) {
-          setTimeout(() => setShowActions(false), 300);
-        }
-      }}
+      onMouseLeave={() => setIsHovering(false)}
     >
-      <div className={`relative max-w-[85%] md:max-w-[70%] min-w-[200px] 
-                      ${isCurrentUser ? 'items-end' : 'items-start'}`}>
-        {isHovering && <MessageActions />}
-        
+      <div className={`relative max-w-[85%] md:max-w-[70%] min-w-[200px] ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+        {isHovering && (
+          <div className="absolute top-0 right-0 bg-gray-100 dark:bg-gray-800 p-2 rounded-full space-x-2">
+            <button onClick={() => setIsEditing(true)}>
+              <Pencil size={16} className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" />
+            </button>
+            <button onClick={handleDelete}>
+              <Trash size={16} className="text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400" />
+            </button>
+          </div>
+        )}
+
         {isFirstInGroup && (
-          <div className={`flex items-center space-x-2 mb-1 
-                          ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {message.user.username}
-            </span>
+          <div className={`flex items-center space-x-2 mb-1 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{message.user.username}</span>
             <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
               <Clock size={12} className="mr-1" />
               {formatTimestamp(message.created_at)}
@@ -298,64 +320,77 @@ const Message = ({
           </div>
         )}
 
-        <div
-          className={`rounded-2xl px-4 py-2 shadow-sm group
-            ${isCurrentUser 
-              ? 'bg-blue-600 text-gray-50' 
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'}
-            ${!isLastInGroup ? 'mb-1' : 'mb-2'}
-            ${isFirstInGroup && isCurrentUser ? 'rounded-tr-md' : ''}
-            ${isFirstInGroup && !isCurrentUser ? 'rounded-tl-md' : ''}
-            transition-all duration-200 hover:shadow-md`}
-          onClick={() => setShowActions(!showActions)}
-        >
-          <div 
-            id={`message-content-${message.id}`}
-            className={`
-              ${isCurrentUser ? 'prose-invert' : ''}
-              relative
-              transition-[max-height,opacity] duration-300 ease-in-out
-              ${!isExpanded && shouldShowExpandButton ? 'max-h-[150px]' : 'max-h-none'}
-              ${!isExpanded && shouldShowExpandButton ? 'overflow-hidden' : ''}
-              [&_pre]:bg-[#1e1e1e] [&_pre]:rounded-lg [&_pre]:p-3 
-              [&_pre]:overflow-x-auto [&_pre]:my-2
-              [&_code]:font-mono [&_code]:text-sm
-              [&_blockquote]:border-l-4 [&_blockquote]:pl-4 [&_blockquote]:italic
-              [&_pre_.token.comment]:text-gray-400
-              [&_pre_.token.string]:text-green-300
-              [&_pre_.token.number]:text-orange-300
-              [&_pre_.token.boolean]:text-orange-300
-              [&_pre_.token.keyword]:text-purple-300
-              [&_pre_.token.function]:text-blue-300
-              [&_pre_.token.operator]:text-gray-300
-              [&_pre_.token.punctuation]:text-gray-300
-              sm:text-base text-sm`}
+        {isEditing ? (
+          <div className={`rounded-2xl px-4 py-2 shadow-sm bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100`}>
+            <ReactQuill value={editedContent} onChange={setEditedContent} />
+            <div className="flex justify-end mt-2 space-x-2">
+              <button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg">
+                Save
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`rounded-2xl px-4 py-2 shadow-sm group
+              ${isCurrentUser ? 'bg-blue-600 text-gray-50' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'}
+              ${!isLastInGroup ? 'mb-1' : 'mb-2'}
+              ${isFirstInGroup && isCurrentUser ? 'rounded-tr-md' : ''}
+              ${isFirstInGroup && !isCurrentUser ? 'rounded-tl-md' : ''}
+              transition-all duration-200 hover:shadow-md`}
           >
-            {renderContent(processedContent)}
-            {!isExpanded && shouldShowExpandButton && (
-              <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t 
-                            from-gray-300 dark:from-gray-900 to-transparent" />
+            <div
+              id={`message-content-${message.id}`}
+              className={`
+                ${isCurrentUser ? 'prose-invert' : ''}
+                relative
+                transition-[max-height,opacity] duration-300 ease-in-out
+                ${!isExpanded && shouldShowExpandButton ? 'max-h-[150px]' : 'max-h-none'}
+                ${!isExpanded && shouldShowExpandButton ? 'overflow-hidden' : ''}
+                [&_pre]:bg-[#1e1e1e] [&_pre]:rounded-lg [&_pre]:p-3 
+                [&_pre]:overflow-x-auto [&_pre]:my-2
+                [&_code]:font-mono [&_code]:text-sm
+                [&_blockquote]:border-l-4 [&_blockquote]:pl-4 [&_blockquote]:italic
+                [&_pre_.token.comment]:text-gray-400
+                [&_pre_.token.string]:text-green-300
+                [&_pre_.token.number]:text-orange-300
+                [&_pre_.token.boolean]:text-orange-300
+                [&_pre_.token.keyword]:text-purple-300
+                [&_pre_.token.function]:text-blue-300
+                [&_pre_.token.operator]:text-gray-300
+                [&_pre_.token.punctuation]:text-gray-300
+                sm:text-base text-sm`}
+            >
+              {renderContent(processedContent)}
+              {!isExpanded && shouldShowExpandButton && (
+                <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-gray-300 dark:from-gray-900 to-transparent" />
+              )}
+            </div>
+
+            {shouldShowExpandButton && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+                className={`text-xs mt-1 hover:underline flex items-center
+                  ${isCurrentUser ? 'text-blue-100' : 'text-blue-600 dark:text-blue-400'}
+                  transition-transform duration-200 hover:scale-105`}
+              >
+                {isExpanded ? (
+                  <span className="flex items-center">Show less <ChevronLeft size={14} className="ml-1" /></span>
+                ) : (
+                  <span className="flex items-center">Show more <ChevronRight size={14} className="ml-1" /></span>
+                )}
+              </button>
             )}
           </div>
-          
-          {shouldShowExpandButton && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
-              }}
-              className={`text-xs mt-1 hover:underline flex items-center
-                ${isCurrentUser ? 'text-blue-100' : 'text-blue-600 dark:text-blue-400'}
-                transition-transform duration-200 hover:scale-105`}
-            >
-              {isExpanded ? (
-                <span className="flex items-center">Show less <ChevronLeft size={14} className="ml-1" /></span>
-              ) : (
-                <span className="flex items-center">Show more <ChevronRight size={14} className="ml-1" /></span>
-              )}
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

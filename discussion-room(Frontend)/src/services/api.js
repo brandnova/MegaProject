@@ -43,6 +43,11 @@ export const getCurrentUser = async () => {
   return response.data;
 };
 
+export const updateUserProfile = async (userInfo) => {
+  const response = await api.put('/auth/update_profile/', userInfo);
+  return response.data;
+};
+
 export const getTopics = async () => {
   const response = await api.get('/topics/');
   return response.data;
@@ -58,6 +63,11 @@ export const createTopic = async (title, description) => {
   return response.data;
 };
 
+export const toggleTopicCommenting = async (topicId) => {
+  const response = await api.post(`/topics/${topicId}/toggle_commenting/`);
+  return response.data;
+};
+
 export const getMessages = async (topicId) => {
   const response = await api.get(`/topics/${topicId}/messages/`);
   return response.data;
@@ -65,6 +75,16 @@ export const getMessages = async (topicId) => {
 
 export const sendMessage = async (topicId, content) => {
   const response = await api.post(`/topics/${topicId}/add_message/`, { content });
+  return response.data;
+};
+
+export const editMessage = async (messageId, content) => {
+  const response = await api.put(`/messages/${messageId}/edit/`, { content });
+  return response.data;
+};
+
+export const deleteMessage = async (messageId) => {
+  const response = await api.delete(`/messages/${messageId}/delete/`);
   return response.data;
 };
 

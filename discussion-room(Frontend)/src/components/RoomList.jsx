@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getTopics, createTopic } from '../services/api';
+import { getTopics, createTopic, getCurrentUser } from '../services/api';
 import { 
   Search, Plus, X, Users, MessageCircle, Calendar,
   Loader2, Filter, SortAsc, SortDesc, Menu
@@ -16,6 +16,7 @@ const RoomList = () => {
   const [filter, setFilter] = useState('all'); 
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   
   const [newTopic, setNewTopic] = useState({
     title: '',
@@ -24,6 +25,7 @@ const RoomList = () => {
 
   useEffect(() => {
     fetchTopics();
+    fetchCurrentUser();
   }, []);
 
   useEffect(() => {
@@ -40,6 +42,15 @@ const RoomList = () => {
       setError('Failed to fetch topics. Please try again later.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchCurrentUser = async () => {
+    try {
+      const userData = await getCurrentUser();
+      setCurrentUser(userData);
+    } catch (error) {
+      setError('Failed to fetch user data. Please try again later.');
     }
   };
 
@@ -110,13 +121,15 @@ const RoomList = () => {
     <div className="min-h-screen bg-gray-50 pb-6">
       {/* Header */}
       <div className="sticky top-0 z-10 p-4 flex w-full justify-end">
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors sm:px-4"
-        >
-          <Plus className="w-5 h-5" />
-          <span className="hidden sm:inline">New Topic</span>
-        </button>
+        {currentUser && currentUser.is_staff && (
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors sm:px-4"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="hidden sm:inline">New Topic</span>
+          </button>
+        )}
       </div>
 
       <div className="max-w-4xl mx-auto px-4 mt-4">
